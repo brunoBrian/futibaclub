@@ -1,43 +1,24 @@
-function abril_paywall_exclude_closed_posts_feeds( $query ) {
-		if ( ! is_admin() && $query->is_main_query() && is_feed() ):
-			$closed_paywall_posts = abril_paywall_get_closed_posts();
-			$query->set( 'post__not_in', $closed_paywall_posts );
-		endif;
-	}
 
-	add_action( 'pre_get_posts', 'abril_paywall_exclude_closed_posts_feeds' );
+// Sends the post_id and receives whether the post will be blocked on the paywall
+$posts_closed = apply_filters( 'abril_remove_posts_of_closed_taxonomy', $post->ID );
 
-	function abril_paywall_get_closed_posts() {
+function remove_posts_of_closed_taxonomy( $id ) {
+    $exclude_taxonomies = apply_filters( 'exclude_paywall_of_taxonomies', array() );
+    $tax_blockeds = get_option('option_fields')['tab-piano']['blocked_blogs'];
+    $term_list = get_the_terms($id, $exclude_taxonomies);
+    $remove_term = false;
 
-		$closed_paywall_posts = array();
+    if ( is_array( $term_list ) ) {
+        foreach ( $tax_blockeds as $tax ) {
+            foreach ( $term_list as $term ) {           
+                if ( $term->slug === $tax ) {
+                    $remove_term = true;
+                }
+            }
+        }
+    }
 
-		$args = array(
-			'es'         => Abril_Utils::abril_is_wpcom(),
-			'meta_query' => array(
-				array(
-					'key'     => 'tipo_paywall',
-					'value'   => 'closed',
-					'compare' => '=',
-				),
-			),
-		);
+    return $remove_term;
+}
 
-		if ( function_exists( 'abril_piano_get_marca_post_types_allowed' ) ) {
-			$post_types        = abril_piano_get_marca_post_types_allowed();
-			$args['post_type'] = $post_types;
-		}
-
-		$paywall_query = new WP_Query( $args );
-
-		if ( $paywall_query->have_posts() ) {
-
-			while ( $paywall_query->have_posts() ) {
-				$paywall_query->the_post();
-				array_push( $closed_paywall_posts, get_the_ID() );
-			}
-			wp_reset_postdata();
-		}
-
-		return $closed_paywall_posts;
-
-	}
+add_filter( 'abril_remove_posts_of_closed_taxonomy', 'remove_posts_of_closed_taxonomy' );
